@@ -1,0 +1,132 @@
+# ============================================================================
+#  Federated-Learning-Disentanglement — RTX 5090 (Blackwell, sm_120) env
+# ----------------------------------------------------------------------------
+#  Target hardware : NVIDIA RTX 5090 (compute capability 12.0)
+#  Target OS       : Linux (Ubuntu 22.04 / 24.04)
+#  CUDA runtime    : 12.8 (bundled with PyTorch wheel — no system CUDA needed)
+#  Python          : 3.10  (same as original working env)
+#
+#  Why these versions?
+#  -------------------
+#  * RTX 5090 requires CUDA >= 12.8 kernels  ->  torch >= 2.7.0+cu128
+#  * torch 2.7  is the FIRST release with official sm_120 (Blackwell) support
+#  * lightning 2.6.x + torchmetrics 1.9.x  are the last versions tested
+#    against your original code (kept identical to your Windows env)
+#  * flwr 1.29 + ray 2.51 work with torch 2.7 (federated stack unchanged)
+#  * albumentations 1.4.0 pinned  -> keeps your augmentation pipeline stable
+#  * numpy pinned to 1.26.4       -> avoids numpy 2.x breaking changes in
+#                                     albumentations, opencv, skimage, monai
+#  * opencv-python-headless       -> server (no GUI) build
+#  * All Windows-only packages    -> REMOVED (win_inet_pton, pywin32, PySide6,
+#                                     m2w64-*, vc14_runtime, ucrt, mkl_fft, ...)
+# ============================================================================
+
+name: ENV_Federated
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  # ---- Core interpreter + build tools (conda-managed for speed & stability)
+  - python=3.10
+  - pip
+  - setuptools
+  - wheel
+
+  # ---- System libs that pip wheels expect (safe to install via conda)
+  - libjpeg-turbo
+  - libpng
+  - libtiff
+  - zlib
+  - ffmpeg          # needed by imageio / opencv video I/O (optional but safe)
+
+  # ---- Everything else via pip so we get exact versions & CUDA-12.8 torch
+  - pip:
+      # =====================================================================
+      #  PyTorch stack — RTX 5090 / Blackwell / sm_120  (CUDA 12.8 wheels)
+      # =====================================================================
+      - --extra-index-url https://download.pytorch.org/whl/cu128
+      - torch==2.7.0
+      - torchvision==0.22.0
+      - torchaudio==2.7.0
+
+      # =====================================================================
+      #  Deep-learning frameworks used by your code
+      # =====================================================================
+      - torchmetrics==1.9.0          # segmentation / classification metrics
+      - lightning==2.6.1             # pl.LightningModule wrappers in models/
+      - lightning-utilities==0.15.3
+      - monai==1.5.2                 # medical-imaging transforms / losses
+
+      # =====================================================================
+      #  Federated learning stack
+      # =====================================================================
+      - flwr==1.29.0                 # Flower federated framework
+      - ray==2.51.1                  # required by flwr simulation engine
+      - grpcio==1.80.0
+      - grpcio-health-checking==1.80.0
+      - protobuf==6.33.6
+      - iterators==0.0.2
+      - pycryptodome==3.23.0
+      - cryptography==46.0.7
+
+      # =====================================================================
+      #  Config / experiment management
+      # =====================================================================
+      - hydra-core==1.3.2
+      - omegaconf==2.3.0
+      - wandb==0.26.1                # experiment tracking
+      - sentry-sdk==2.58.0           # wandb dep
+      - GitPython==3.1.47            # wandb dep
+
+      # =====================================================================
+      #  Data & image processing (used by data.py, augmentation, evaluation)
+      # =====================================================================
+      - numpy==1.26.4                # PIN — do NOT upgrade to 2.x
+      - pandas==2.2.3                # for evaluation CSV export
+      - scipy==1.15.2                # scipy.stats.t used in evaluation
+      - scikit-learn==1.7.2          # sklearn.metrics.average_precision_score
+      - scikit-image==0.24.0         # skimage.io, skimage.metrics.hausdorff_distance
+      - opencv-python-headless==4.13.0.92
+      - albumentations==1.4.0        # PIN — augmentation pipeline
+      - qudida==0.0.4                # albumentations dep
+      - pillow==10.4.0
+      - imageio==2.36.1
+      - tifffile==2024.9.20
+      - PyWavelets==1.8.0            # skimage dep
+      - nibabel==5.3.2               # monai dep (medical formats)
+
+      # =====================================================================
+      #  Plotting (kept in case you generate figures)
+      # =====================================================================
+      - matplotlib==3.10.9
+      - contourpy==1.3.1
+      - kiwisolver==1.4.7
+      - cycler==0.12.1
+      - fonttools==4.55.3
+
+      # =====================================================================
+      #  Model-specific helpers
+      # =====================================================================
+      - einops==0.8.2                # used by UTNet / SD-UTNet attention
+
+      # =====================================================================
+      #  Utilities used across the codebase
+      # =====================================================================
+      - tqdm==4.67.1
+      - PyYAML==6.0.2
+      - typing_extensions==4.12.2
+      - packaging==25.0
+      - filelock==3.16.1
+      - fsspec==2024.10.0
+      - jinja2==3.1.4
+      - markupsafe==3.0.2
+      - mpmath==1.3.0
+      - sympy==1.13.3
+      - networkx==3.4.2
+      - joblib==1.4.2
+      - threadpoolctl==3.5.0
+      - click==8.1.7
+      - rich==13.9.4
+      - typer==0.15.1
+      - xlsxwriter==3.2.9            # optional Excel export

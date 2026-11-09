@@ -1,0 +1,29 @@
+# @package _global_
+
+name: sd_utnet_p_factor_fold2_dftht
+desc: P_factor based inverse area with log_100**2 with my_details with 2 / batch_size, and FedDG-DFTHT augmentation enabled (Fold 2)
+
+client:
+  lr: 0.0001
+  p_factor_enabled: True
+
+server:
+  strategy: fedgs_dftht
+  num_rounds: 100
+  gradient_mode: True
+
+data:
+  load_names: True
+  out_center: 6
+  splits: per_fold
+  fold_nr: 2
+  my_details: True
+
+# ── FedDG-DFTHT augmentation hyperparameters ──
+dftht:
+  enabled: True
+  L: 0.1                  # low-frequency window ratio
+  ratio: [0.0, 1.0]       # interpolation ratio (sampled uniformly)
+  alpha: 0.05             # hard-threshold ratio (5%)
+  prob: 0.3               # probability of applying augmentation per sample
+  amp_pool_max_samples: 10 # max spectra sampled per foreign center (reduced for 12GB GPU)

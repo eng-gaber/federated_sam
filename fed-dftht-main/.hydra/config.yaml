@@ -1,0 +1,48 @@
+client:
+  num_cpus: 8
+  num_gpus: 1
+  model: sd_utnet
+  weight_init: xavier
+  epochs: 5
+  lr: 0.0001
+  p_factor_enabled: true
+  loss_type: composite
+  lambda_dice: 0.7
+  lambda_bce: 0.2
+  lambda_focal: 0.1
+server:
+  num_clients: 5
+  num_rounds: 100
+  gmf: 0
+  strategy: fedgs_dftht
+  resume_from_round: null
+  resume_cfg_name: null
+  save_resume_enabled: false
+  gradient_mode: true
+two_stage:
+  enabled: false
+  aug_epochs: null
+  train_rounds: null
+data:
+  dataset: polypgen
+  batch_size: 4
+  target_size: 512
+  out_center: 6
+  splits: per_fold
+  seed: 1
+  load_in_ram: false
+  load_names: true
+  my_details: true
+  fold_nr: 4
+dftht:
+  enabled: true
+  L: 0.1
+  ratio:
+  - 0.0
+  - 1.0
+  alpha: 0.05
+  prob: 0.3
+  amp_pool_max_samples: 10
+name: sd_utnet_p_factor_fold4_dftht_composite
+desc: P_factor based inverse area with log_100**2 with my_details with 2 / batch_size,
+  and FedDG-DFTHT augmentation and Composite Loss enabled (Fold 2)

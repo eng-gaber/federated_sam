@@ -1,0 +1,55 @@
+defaults:
+  - _self_
+  - experiment: default
+
+client:
+  num_cpus: 8
+  num_gpus: 1
+  model: sd_utnet
+  weight_init: xavier
+  epochs: 5
+  lr: 0.0001
+  p_factor_enabled: False
+  loss_type: "default"
+  lambda_dice: 0.7
+  lambda_bce: 0.2
+  lambda_focal: 0.1
+
+server:
+  num_clients: 5
+  num_rounds: 50
+  gmf: 0
+  strategy: fedavg
+  resume_from_round: null
+  resume_cfg_name: null
+  save_resume_enabled: False
+  gradient_mode: True
+
+two_stage:
+  enabled: False
+  aug_epochs: null
+  train_rounds: null
+
+data:
+  dataset: polypgen
+  batch_size: 4
+  target_size: 512
+  out_center: 6
+  splits: per_patient
+  seed: 1
+  load_in_ram: False
+  load_names: False
+  my_details: True
+  fold_nr: null
+
+dftht:
+  enabled: False
+  L: 0.1
+  ratio: [0.0, 1.0]
+  alpha: 0.05
+  prob: 0.5
+  amp_pool_max_samples: 50
+
+hydra:
+  run:
+    dir: .

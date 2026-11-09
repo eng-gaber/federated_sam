@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual environments
+venv/
+ENV_Federated/
+.env
+
+# Datasets
+data/
+dataset/
+datasets/
+
+# Model checkpoints
+checkpoints/
+*.pth
+*.pt
+*.ckpt
+
+# Logs and outputs
+logs/
+runs/
+wandb/
+outputs/
+results/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

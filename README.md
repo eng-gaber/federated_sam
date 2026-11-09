@@ -1,3 +1,11 @@
+
+cd "/home/omanchat/Downloads/Antigravity IDE"
+./antigravity-ide
+
+cd ~/Downloads/Antigravity-x64
+chmod +x antigravity
+./antigravity
+
 # Finetune SAM on your customized medical imaging dataset
 Authors: [Hanxue Gu*](https://scholar.google.com/citations?hl=en&user=aGjCpQUAAAAJ&view_op=list_works&sortby=pubdate), [Haoyu Dong*](https://scholar.google.com/citations?user=eZVEUCIAAAAJ&hl=en), [Jichen Yang](https://scholar.google.com/citations?user=jGv3bRUAAAAJ&hl=en), [Maciej A. Mazurowski](https://scholar.google.com/citations?user=HlxjJPQAAAAJ&hl=en)
 

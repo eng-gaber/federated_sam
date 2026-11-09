@@ -1,0 +1,53 @@
+# ==============================================================================
+# Configuration: Baseline MedSAM ViT-B + Standard FedAvg (Pure Backbone Baseline)
+# ==============================================================================
+# PURPOSE: Bare-minimum MedSAM experiment — no FedGS, no composite loss, no MoE.
+#          This is the reference point to measure each component's contribution:
+#            +FedGS+Composite → medsam_fedgs_composite_loss_r8_20rounds
+#            +Scale-MoE       → medsam_fedgs_scale_decoder_moe_r8_20rounds
+# COMPARE: baseline_sam_fedavg (0.7918 DSC with SAM backbone)
+# ==============================================================================
+
+experiment:
+  run_name: "baseline_medsam_fedavg_r8_20rounds"
+  output_root: "checkpoints/runs"
+  save_checkpoints: true
+
+federated:
+  num_rounds: 30
+  local_epochs: 2
+  batch_size: 2
+  learning_rate: 0.0002
+  lr_schedule: "cosine"
+  min_lr: 0.00001
+  weight_decay: 0.00001
+  num_clients: 5
+  out_center: "5"            # Client index 5 = Center 6 (Strict Unseen Domain)
+  split_type: "fold"
+  fold_nr: 1
+
+model:
+  arch: "vit_b"
+  sam_checkpoint: "medsam_vit_b.pth"   # ← MedSAM (medical pre-trained)
+  num_cls: 2
+  lora_rank: 8               # LoRA rank r=8
+  if_encoder_lora_layer: true
+  if_decoder_lora_layer: true
+  if_update_encoder: true
+
+fed_fgs:
+  enable_fedgs: false        # Standard FedAvg (NO gradient scaling)
+  dftht_prob: 0.0            # NO Fourier frequency augmentation
+  dftht_L: 0.1
+  dftht_alpha: 0.05
+  amp_pool_max_samples: 0
+  lambda_dice: 1.0           # Standard Dice loss
+  lambda_bce: 1.0            # Standard BCE loss
+  lambda_focal: 0.0          # NO focal loss
+
+dataset:
+  data_root: "polyp_db_dataset/data"
+  metadata_root: "polyp_db_dataset/metadata"
+  splits_root: "fed-dftht-main/data_polypgen/splits/fold_splits"
+  image_size: 1024
+  num_workers: 4

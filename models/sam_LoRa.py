@@ -12,6 +12,9 @@ from safetensors import safe_open
 from safetensors.torch import save_file
 
 from icecream import ic
+from typing import Optional, Dict, List, Union
+from .mode_mlp import MoDE_MLP
+from .scale_moe_decoder import ScaleAwareDualMaskDecoder
 
 
 class _LoRA_qkv(nn.Module):
@@ -90,6 +93,10 @@ class LoRA_Sam(nn.Module):
         
         # base_vit_dim = sam_model.image_encoder.patch_embed.proj.out_channels
         # dim = base_vit_dim
+        # Freeze prompt_encoder parameters (dense segmentation without prompt tokens)
+        for param in sam_model.prompt_encoder.parameters():
+            param.requires_grad = False
+
         if self.args.if_encoder_lora_layer:
             if len(self.args.encoder_lora_layer)>0:
                 self.lora_layer = self.args.encoder_lora_layer
@@ -235,9 +242,93 @@ class LoRA_Sam(nn.Module):
             block.q_proj = _LoRA_qkv_proj(fa_ti_q_proj, self.fa_ti_q_proj_A, self.fa_ti_q_proj_B)
             block.v_proj = _LoRA_qkv_proj(fa_ti_v_proj, self.fa_ti_v_proj_A, self.fa_ti_v_proj_B)
 
+        # -------------------------------------------------------------
+        # MoDE: Mixture of Domain Experts in selected encoder blocks
+        # -------------------------------------------------------------
+        self.mode_mlps = []
+        enable_mode = getattr(self.args, "enable_mode", False)
+        if enable_mode:
+            raw_blocks = getattr(self.args, "mode_blocks", [10, 11])
+            if isinstance(raw_blocks, str):
+                import ast
+                mode_blocks = ast.literal_eval(raw_blocks) if "[" in raw_blocks else [int(x) for x in raw_blocks.split(",")]
+            else:
+                mode_blocks = list(raw_blocks)
+
+            num_experts = getattr(self.args, "mode_num_experts", 5)
+            mode_rank = getattr(self.args, "mode_lora_rank", 4)
+            mode_alpha = getattr(self.args, "mode_lora_alpha", 4.0)
+            mode_dropout = getattr(self.args, "mode_lora_dropout", 0.0)
+            top_k = getattr(self.args, "mode_top_k", 2)
+            gate_hidden_dim = getattr(self.args, "mode_gate_hidden_dim", 128)
+            routing_mode = getattr(self.args, "mode_routing_mode", "mode_a")
+            center_prior_lambda = getattr(self.args, "mode_center_prior_lambda", 0.2)
+
+            for blk_idx in mode_blocks:
+                if 0 <= blk_idx < len(sam_model.image_encoder.blocks):
+                    blk = sam_model.image_encoder.blocks[blk_idx]
+                    dim = blk.norm2.normalized_shape[0] if hasattr(blk.norm2, "normalized_shape") else 768
+                    mlp_dim = blk.mlp.lin1.out_features
+                    blk.mlp = MoDE_MLP(
+                        base_mlp=blk.mlp,
+                        block_idx=blk_idx,
+                        embedding_dim=dim,
+                        mlp_dim=mlp_dim,
+                        num_experts=num_experts,
+                        r=mode_rank,
+                        lora_alpha=mode_alpha,
+                        lora_dropout=mode_dropout,
+                        top_k=top_k,
+                        gate_hidden_dim=gate_hidden_dim,
+                        routing_mode=routing_mode,
+                        center_prior_lambda=center_prior_lambda,
+                    )
+                    self.mode_mlps.append(blk.mlp)
+            print(f"[MoDE] Initialized {len(self.mode_mlps)} MoDE-MLP blocks at indices {mode_blocks} "
+                  f"(E={num_experts}, top_k={top_k}, r={mode_rank}, mode={routing_mode}, lambda={center_prior_lambda})")
+
         self.reset_parameters()
+
+        # -------------------------------------------------------------
+        # Scale-Aware Dual-Decoder MoE
+        # -------------------------------------------------------------
+        self.scale_dual_decoder = None
+        enable_scale_moe = getattr(self.args, "enable_scale_decoder_moe", False)
+        if enable_scale_moe:
+            gate_hidden_dim = getattr(self.args, "scale_moe_gate_hidden_dim", 64)
+            beta = getattr(self.args, "scale_moe_beta", 0.5)
+            lambda_gate = getattr(self.args, "scale_moe_lambda_gate", 0.1)
+            sam_model.mask_decoder = ScaleAwareDualMaskDecoder(
+                base_decoder=sam_model.mask_decoder,
+                gate_hidden_dim=gate_hidden_dim,
+                beta=beta,
+                lambda_gate=lambda_gate,
+            )
+            self.scale_dual_decoder = sam_model.mask_decoder
+            print(f"[Scale-MoE] Initialized ScaleAwareDualMaskDecoder (gate_dim={gate_hidden_dim}, beta={beta}, lambda_gate={lambda_gate})")
+
         self.sam = sam_model
-        
+
+        # Attach MoDE helper functions to sam_model for client access
+        self.sam.set_center_id = self.set_center_id
+        self.sam.get_expert_usage = self.get_expert_usage
+        self.sam.reset_expert_usage = self.reset_expert_usage
+        self.sam.mode_mlps = self.mode_mlps
+
+    def set_center_id(self, center_id: Optional[int]) -> None:
+        """Propagate client center ID to all MoDE modules."""
+        for mlp in self.mode_mlps:
+            mlp.set_center_id(center_id)
+
+    def get_expert_usage(self) -> Dict[int, Dict[int, float]]:
+        """Return expert routing distributions per MoDE block."""
+        return {mlp.block_idx: mlp.get_expert_usage_distribution() for mlp in self.mode_mlps}
+
+    def reset_expert_usage(self) -> None:
+        """Reset expert routing counters across all MoDE blocks."""
+        for mlp in self.mode_mlps:
+            mlp.reset_expert_usage()
+
     def reset_parameters(self) -> None:
         if self.args.if_encoder_lora_layer:
             for w_A in self.w_As:
@@ -261,6 +352,9 @@ class LoRA_Sam(nn.Module):
             nn.init.zeros_(self.fa_ti_q_proj_B.weight)
             nn.init.kaiming_uniform_(self.fa_ti_v_proj_A.weight, a=math.sqrt(5))
             nn.init.zeros_(self.fa_ti_v_proj_B.weight)
-        
-    def forward(self, batched_input, multimask_output,image_size):
-        return self.sam(batched_input, multimask_output,image_size)
+        for mlp in getattr(self, "mode_mlps", []):
+            for expert in mlp.experts:
+                expert.reset_parameters()
+
+    def forward(self, batched_input, multimask_output, image_size):
+        return self.sam(batched_input, multimask_output, image_size)

@@ -1,0 +1,59 @@
+# ==============================================================================
+# Configuration: MoDE-2 (Blocks 10, 11) with SAM ViT-B + FedGS (Mode B Center Prior, r=8)
+# ==============================================================================
+
+experiment:
+  run_name: "mode2_center_prior_sam_fedgs_r8"
+  output_root: "checkpoints/runs"
+  save_checkpoints: true
+
+federated:
+  num_rounds: 20
+  local_epochs: 2
+  batch_size: 2
+  learning_rate: 0.0002
+  lr_schedule: "cosine"
+  min_lr: 0.00001
+  weight_decay: 0.00001
+  num_clients: 5
+  out_center: "5"            # Client index 5 = Center 6 (Strict Unseen Domain)
+  split_type: "fold"
+  fold_nr: 1
+
+model:
+  arch: "vit_b"
+  sam_checkpoint: "sam_vit_b_01ec64.pth"
+  num_cls: 2
+  lora_rank: 8               # LoRA rank r=8
+  if_encoder_lora_layer: true
+  if_decoder_lora_layer: true
+  if_update_encoder: true
+
+mode:
+  enable_mode: true
+  mode_blocks: [10, 11]      # Last two encoder blocks
+  mode_num_experts: 5        # 5 experts for training centers C1-C5
+  mode_lora_rank: 8          # LoRA rank r=8 for expert MLP projections
+  mode_lora_alpha: 8.0
+  mode_lora_dropout: 0.0
+  mode_top_k: 2              # Top-2 routing
+  mode_gate_hidden_dim: 128  # Lightweight token-wise gating network
+  mode_routing_mode: "mode_b" # Mode B: Center-prior gating for training clients
+  mode_center_prior_lambda: 0.2 # Prior weight lambda=0.2 (strictly disabled for unseen C6)
+
+fed_fgs:
+  enable_fedgs: true
+  dftht_prob: 0.3
+  dftht_L: 0.1
+  dftht_alpha: 0.05
+  amp_pool_max_samples: 25
+  lambda_dice: 0.7
+  lambda_bce: 0.2
+  lambda_focal: 0.1
+
+dataset:
+  data_root: "polyp_db_dataset/data"
+  metadata_root: "polyp_db_dataset/metadata"
+  splits_root: "fed-dftht-main/data_polypgen/splits/fold_splits"
+  image_size: 1024
+  num_workers: 4

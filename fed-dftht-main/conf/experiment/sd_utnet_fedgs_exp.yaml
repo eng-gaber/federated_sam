@@ -1,0 +1,29 @@
+# @package _global_
+
+name: sd_utnet_fedgs_exp
+desc: Federated learning using FedGS strategy, polypgen per_center split, and p_factor enabled
+
+client:
+  lr: 0.0001
+  p_factor_enabled: True
+  model: sd_utnet_fed
+  epochs: 5
+
+server:
+  strategy: fedgs
+  num_rounds: 50
+  gradient_mode: True
+  resume_from_round: null
+  resume_cfg_name: null
+  save_resume_enabled: True
+
+two_stage:
+  enabled: True
+  aug_epochs: 5
+  train_rounds: 80
+
+data:
+  dataset: polypgen
+  splits: per_center
+  load_names: False
+  my_details: False

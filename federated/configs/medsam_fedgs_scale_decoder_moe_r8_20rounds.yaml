@@ -1,0 +1,63 @@
+# ==============================================================================
+# Configuration: MedSAM ViT-B + FedGS + Scale-Aware Dual-Decoder MoE (20 Rounds)
+# PURPOSE: Combine best decoder arch (Scale MoE, 0.8064 DSC with SAM) + MedSAM backbone
+# EXPECTED: Highest overall DSC — medical encoder + scale-specialized decoders
+# ==============================================================================
+# Architecture:
+# 1. Image Encoder: MedSAM ViT-B (medical pre-trained) + LoRA r=8
+# 2. Decoder: Scale-Aware Dual-Decoder MoE (D_small & D_large)
+#    - Scale Gate: GAP(F) -> LN -> MLP(256 -> 64 -> 2) -> Softmax
+#    - D_small: Specialized for diminutive & subtle polyps
+#    - D_large: Specialized for large & high-contrast polyps
+# 3. Multi-Task Loss: L_mix + 0.5*L_expert + 0.1*L_gate
+# ==============================================================================
+
+experiment:
+  run_name: "medsam_fedgs_scale_decoder_moe_r8_20rounds"
+  output_root: "checkpoints/runs"
+  save_checkpoints: true
+
+federated:
+  num_rounds: 30
+  local_epochs: 2
+  batch_size: 2
+  learning_rate: 0.0002
+  lr_schedule: "cosine"
+  min_lr: 0.00001
+  weight_decay: 0.00001
+  num_clients: 5
+  out_center: "5"            # Client index 5 = Center 6 (Strict Unseen Domain)
+  split_type: "fold"
+  fold_nr: 1
+
+model:
+  arch: "vit_b"
+  sam_checkpoint: "medsam_vit_b.pth"   # ← MedSAM (medical pre-trained)
+  num_cls: 2
+  lora_rank: 8               # LoRA rank r=8
+  if_encoder_lora_layer: true
+  if_decoder_lora_layer: true
+  if_update_encoder: true
+
+  # Scale-Aware Dual-Decoder MoE Settings
+  enable_scale_decoder_moe: true
+  scale_moe_gate_hidden_dim: 64
+  scale_moe_beta: 0.5        # Scale-specialization weight
+  scale_moe_lambda_gate: 0.1 # Gating supervision weight
+
+fed_fgs:
+  enable_fedgs: true         # FedGS dynamic gradient scaling eta_t
+  dftht_prob: 0.0            # Clean — no Fourier perturbation
+  dftht_L: 0.1
+  dftht_alpha: 0.05
+  amp_pool_max_samples: 0
+  lambda_dice: 0.7           # Composite Dice loss
+  lambda_bce: 0.2            # Composite BCE loss
+  lambda_focal: 0.1          # Composite Focal loss
+
+dataset:
+  data_root: "polyp_db_dataset/data"
+  metadata_root: "polyp_db_dataset/metadata"
+  splits_root: "fed-dftht-main/data_polypgen/splits/fold_splits"
+  image_size: 1024
+  num_workers: 4

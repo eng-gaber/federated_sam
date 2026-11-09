@@ -1,1 +1,53 @@
+# ==============================================================================
+# Git Ignore for Federated SAM Research Project
+# ==============================================================================
+
+# Byte-compiled / optimized / Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.env
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Large Model Checkpoints & Pretrained Weights (>100MB rejected by GitHub)
 *.pth
+*.pt
+*.ckpt
+*.bin
+*.safetensors
+*.tar.gz
+*.zip
+medsam_vit_b.pth
+sam_vit_b_01ec64.pth
+checkpoints/
+fed-dftht-main/ckpts/
+
+# Datasets and Raw Image Collections (Do not upload images to GitHub)
+polyp_db_dataset/data/
+fed-dftht-main/data_polypgen/data/
+datasets/
+data/
+
+# Image Files (Strictly exclude all images)
+*.png
+*.jpg
+*.jpeg
+*.tif
+*.tiff
+*.bmp
+*.gif
+*.svg
+
+# External cloned submodules / large third-party repos
+MONAI/
+
+# Logs & Run outputs
+logs/
+*.log
