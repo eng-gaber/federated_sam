@@ -44,6 +44,7 @@ data/
 *.bmp
 *.gif
 *.svg
+!reports/figures/*.png
 
 # External cloned submodules / large third-party repos
 MONAI/
